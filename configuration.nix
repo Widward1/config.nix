@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }:
+{ config, pkgs, lib, writeText, ... }:
 
 {
   imports =
@@ -12,35 +12,34 @@
     ];
 
   # Bootloader.
-  boot.loader.grub.enable = true;
-  boot.loader.grub.device = "/dev/sda";
-  boot.loader.grub.useOSProber = true;
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+  boot.loader.efi.efiSysMountPoint = "/boot/efi";
 
   # Setup keyfile
-
   boot.initrd.secrets = {
     "/crypto_keyfile.bin" = null;
   };
 
-  # Enable grub cryptodisk
-  boot.loader.grub.enableCryptodisk=true;
-
-  boot.initrd.luks.devices."luks-45bca1c7-3bce-4046-872b-f31a9cc1444e".keyFile = "/crypto_keyfile.bin";
   # Enable swap on luks
-  boot.initrd.luks.devices."luks-475bf6ac-ec0d-41d3-86bb-959c1a64b185".device = "/dev/disk/by-uuid/475bf6ac-ec0d-41d3-86bb-959c1a64b185";
-  boot.initrd.luks.devices."luks-475bf6ac-ec0d-41d3-86bb-959c1a64b185".keyFile = "/crypto_keyfile.bin";
+  boot.initrd.luks.devices."luks-fdeae508-f826-41cd-a4a7-176b7e96f67b".device = "/dev/disk/by-uuid/fdeae508-f826-41cd-a4a7-176b7e96f67b";
+  boot.initrd.luks.devices."luks-fdeae508-f826-41cd-a4a7-176b7e96f67b".keyFile = "/crypto_keyfile.bin";
 
   networking.hostName = "stinkpad"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
-  
-  # Auto-update
-  
- # system.autoUpgrade = {
- #   enable = true;
- #   channel = "https://nixos.org/channels/nixos-unstable";
- # };
-  
-  # Flakes
+
+  # Configure network proxy if necessary
+  # networking.proxy.default = "http://user:password@proxy:port/";
+  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
+
+  # Enable networking
+  networking.networkmanager.enable = true;
+
+  # Set your time zone.
+  time.timeZone = "America/Los_Angeles";
+
+  # Select internationalisation properties.
+  i18n.defaultLocale = "en_US.utf8";
 
   nix = {
     package = pkgs.nixFlakes;
@@ -48,13 +47,18 @@
     allowedUsers = [ "@wheel" ];
   };
 
-  # modprobe 
+  nix.settings = {
+    substituters = [ "https://nix-gaming.cachix.org" ];
+    trusted-public-keys = [ "nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4=" ];
+  };
+
+  # modprobe
 
   boot.extraModprobeConfig = ''
     blacklist wacom
     blacklist hid_uclogic
   '';
-  
+
   # Hardening
   boot.kernelPackages = pkgs.linuxPackages_hardened;
 
@@ -72,6 +76,7 @@
   boot.kernel.sysctl."fs.protected_fifos" = 2;
   boot.kernel.sysctl."fs.protected_regular" = 2;
   boot.kernel.sysctl."fs.suid_dumpable" = 0;
+  #boot.kernel.sysctl."dev.i915.perf_stream_paranoid" = 0;
 
 
   #security.forcePageTableIsolation = true;
@@ -91,7 +96,6 @@
   boot.kernelParams = [
     # Slab/slub sanity checks, redzoning, and poisoning
     "slub_debug=FZP"
-
     # Overwrite free'd memory
     "page_poison=1"
 
@@ -132,7 +136,7 @@
     "qnx6"
     "sysv"
     "ufs"
-     
+
      # Custom
 
      "dccp"
@@ -158,8 +162,6 @@
 
   # Disable ftrace debugging
   #boot.kernel.sysctl."kernel.ftrace_enabled" = false;
-
-  # Enable strict reverse path filtering (that is, do not attempt to route
   # packets that "obviously" do not belong to the iface's network; dropped
   # packets are logged as martians).
   boot.kernel.sysctl."net.ipv4.conf.all.log_martians" = true;
@@ -187,48 +189,38 @@
   # networking.proxy.default = "http://user:password@proxy:port/";
   # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
 
-  # Enable networking
-  networking.networkmanager.enable = true;
-
-  # Set your time zone.
-  time.timeZone = "America/Los_Angeles";
-
-  # Select internationalisation properties.
-  i18n.defaultLocale = "en_US.utf8";
-
-  # Configure keymap in X11
-  services.xserver = {
-    layout = "us";
-    xkbVariant = "";
-  };
-
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.widward = {
     isNormalUser = true;
     description = "stinkpad";
-    extraGroups = [ "networkmanager" "wheel" "audio" "video" ];
+    extraGroups = [ "networkmanager" "wheel" "audio" "video" "rtkit" ];
     packages = with pkgs; [
          firefox
-	 mpv
-	 neovim
-	 ranger
-	 feh
-	 pulsemixer
-	 wget
-	 neofetch
-	 pass
-	 spotifyd
-	 spotify-tui
-	 nsxiv
-	 ani-cli
-	 ffmpeg
-	 axel
-	 cachix
-	 neofetch
-	 xdragon
+	 gotop
+	 maim
+         mpv
+         neovim
+         ranger
+         feh
+         pulsemixer
+         wget
+         neofetch
+         pass
+         spotifyd
+         spotify-tui
+         nsxiv
+         ani-cli
+         ffmpeg
+         axel
+         cachix
+         neofetch
+         xdragon
+	 htop-vim
+	 discord
      ];
   };
-  
+
+  security.chromiumSuidSandbox.enable = true;
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
@@ -243,11 +235,9 @@
   dwmblocks
   st
   dmenu
-  polybar
-  sxhkd
   alacritty
-  pulseaudio  
-  wineWowPackages.stableFull
+  pulseaudio
+  wineWowPackages.stagingFull
   winetricks
   policycoreutils
   dunst
@@ -255,6 +245,7 @@
   libnotify
   bash-completion
   git
+  alsa-utils
   ];
 
 fonts.fonts = with pkgs; [
@@ -275,7 +266,7 @@ security.rtkit.enable = true;
 sound.enable = false;
 
 services.dbus.packages = [  pkgs.gcr ];
- 
+
 services.pipewire.enable = true;
 services.pipewire.alsa.enable = true;
 services.pipewire.pulse.enable = true;
@@ -314,6 +305,7 @@ services.pipewire = {
         flags = [ "ifexists" "nofail" ];
       }
       {
+#     {
         name = "libpipewire-module-access";
         args = {};
       }
@@ -390,23 +382,23 @@ services.pipewire = {
   system.stateVersion = "22.05"; # Did you read the comment?
 
   services.xserver.libinput.enable = true;
-  
+
   services.xserver = {
     enable = true;
     displayManager = {
-       defaultSession = "none+bspwm";
+       defaultSession = "none+dwm";
        lightdm.greeters.mini = {
          enable = true;
          user = "widward";
          extraConfig = ''
            [greeter-theme]
            background-image = "/opt/sanaebg3.png"
-           font = terminus 
+           font = terminus
           '';
        };
     };
   };
-  
+
   # Hardware Accelertation
 
   hardware.opengl = {
@@ -422,7 +414,7 @@ services.pipewire = {
 
   services.xserver.windowManager.dwm.enable = true;
 
-  services.xserver.windowManager.bspwm.enable = true;
+  #services.xserver.windowManager.bspwm.enable = true;
 
   hardware.acpilight.enable = true;
 
@@ -439,7 +431,6 @@ services.pipewire = {
       INTEL_GPU_MAX_FREQ_ON_BAT=40;
       INTEL_GPU_BOOST_FREQ_ON_AC=1;
       INTEL_GPU_BOOST_FREQ_ON_BAT=0;
-
     };
   };
 
@@ -447,13 +438,12 @@ services.pipewire = {
 
   hardware.opentabletdriver.enable = true;
 
-  # nextdns 
+  # nextdns
 
   services.nextdns = {
     enable = true;
     arguments = [ "-config" "10.0.3.0/24=abcdef" "-cache-size" "10MB" ];
   };
-
 
   nixpkgs.overlays = [
    (final: prev: {
@@ -462,12 +452,25 @@ services.pipewire = {
    (final: prev: {
      dmenu = prev.dmenu.overrideAttrs (old: { src =/home/widward/widwardDWM/dmenu-5.1 ;});
    })
-#   (final: prev: {
-#     st = prev.st.overrideAttrs (old: { src =/home/widward/widwardDWM/st-0.8.5 ;});
-#   })
    (final: prev: {
-     dwmblocks = prev.dwmblocks.overrideAttrs (old: { src =/home/widward/widwardDWM/dwmblocks ;});
+     st = prev.st.overrideAttrs (old: { 
+     src = /home/widward/widwardDWM/st-0.8.5 ;
+     prePatch = ''sed -i "s@/usr/local@$out@" config.mk '';
+     });
    })
+   (final: prev: {
+     dwmblocks = prev.dwmblocks.overrideAttrs (old: { 
+     src =/home/widward/widwardDWM/dwmblocks ;
+     #makeFlags = [ "PREFIX=$(out)" ];
+     #prePatch = ''sed -i "s@/usr/local@$out@" Makefile '';
+     });
+   })
+   #(final: prev: {
+   #  dwmblocks = prev.dwmblocks.overrideAttrs (old: {
+   #  src = builtins.fetchTarball https://github.com/Widward1/widwardDWM/releases/download/master/dwmblocks.tar.gz;
+     #config = prev.writeText "blocks.h" (builtins.readFile ./blocks.h);
+       #postPatch = "${old.postPatch}\ncp ${config} blocks.def.h\n";
+   #    });
+   #  })
    ];
-
 }
